@@ -1,0 +1,14 @@
+[package]
+name = "git-mirror"
+version = "0.1.0"
+authors = ["Bond_009 <bond.009@outlook.com>"]
+edition = "2018"
+
+[dependencies]
+clap = "^2.33"
+git2 = "^0.13"
+toml = "^0.5"
+
+[dependencies.serde]
+version = "^1.0"
+features = ["derive"]
