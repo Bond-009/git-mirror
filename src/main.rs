@@ -8,7 +8,7 @@ use std::{
 };
 
 use clap::*;
-use git2::{build::CheckoutBuilder, AutotagOption, Direction, FetchOptions, Repository};
+use git2::{build::CheckoutBuilder, Direction, Repository};
 
 use config::*;
 
@@ -108,20 +108,17 @@ fn update() {
             }
         };
 
-        let mut fo = FetchOptions::new();
-        fo.download_tags(AutotagOption::All);
         let mut remote = repo.find_remote("origin").unwrap();
         remote.connect(Direction::Fetch).unwrap();
         let branch_buf = remote.default_branch().unwrap();
         let branch = branch_buf.as_str().unwrap();
-        if remote.fetch(&[branch], Some(&mut fo), None).is_err() {
+        if remote.fetch(&[branch], None, None).is_err() {
             eprintln!("Failed fetching branch {} for {:#?}", branch, &path);
             continue;
         }
 
         let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
         let com = repo.reference_to_annotated_commit(&fetch_head).unwrap();
-
         let mut branch_ref = repo.find_reference(&branch).unwrap();
         branch_ref.set_target(com.id(), "IDK").unwrap();
         repo.set_head(&branch).unwrap();
