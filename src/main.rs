@@ -61,8 +61,7 @@ fn main() {
 }
 
 fn get_config(config: Option<&str>) -> Config {
-    let config_path = match config
-    {
+    let config_path = match config {
         Some(c) => Cow::Borrowed(c),
         None => match env::var("GIT_MIRROR_CONFIG") {
             Ok(c) => Cow::Owned(c),
@@ -89,6 +88,10 @@ fn get_config(config: Option<&str>) -> Config {
 
 fn init(path: &Path, project: &ProjectConfig)  -> Result<(), git2::Error> {
     let _repo = Repository::clone(&project.url, path)?;
+    if let Some(d) = &project.description {
+        utils::set_description(path, d).unwrap();
+    }
+
     Ok(())
 }
 
