@@ -8,7 +8,7 @@ pub struct Config {
 
 #[derive(Deserialize)]
 pub struct ProjectConfig {
-    pub name: String,
+    pub name: Option<String>,
     pub path: Option<String>,
     pub url: String,
     pub description: Option<String>,

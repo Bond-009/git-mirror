@@ -1,4 +1,5 @@
 mod config;
+mod utils;
 
 use std::{
     env,
@@ -65,7 +66,12 @@ fn init() {
         path.push(Path::new(
             project.path.as_ref().unwrap_or(&config.default_path),
         ));
-        path.push(project.name);
+
+        match project.name {
+            Some(name) => path.push(name),
+            None => path.push(utils::get_repo_name(&project.url))
+        };
+
         if path.exists() {
             println!("{:#?} already exists, skipping.", path);
             continue;
@@ -94,7 +100,12 @@ fn update() {
         path.push(Path::new(
             project.path.as_ref().unwrap_or(&config.default_path),
         ));
-        path.push(project.name);
+
+        match project.name {
+            Some(name) => path.push(name),
+            None => path.push(utils::get_repo_name(&project.url))
+        };
+
         if !path.exists() {
             println!("{:#?} doesn't exist, skipping.", &path);
             continue;
