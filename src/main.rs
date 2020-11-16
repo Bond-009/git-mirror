@@ -2,6 +2,7 @@ mod config;
 mod utils;
 
 use std::{
+    borrow::Cow,
     env,
     fs::File,
     io::Read,
@@ -18,24 +19,37 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
+        .arg(Arg::with_name("config")
+            .short("c")
+            .long("config")
+            .value_name("FILE")
+            .help("Sets a custom config file")
+            .takes_value(true))
         .subcommand(SubCommand::with_name("init"))
         .subcommand(SubCommand::with_name("update"))
         .get_matches();
 
+    let config = get_config(matches.value_of("config"));
+
     if matches.subcommand_matches("init").is_some() {
-        init();
+        init(&config);
     } else if matches.subcommand_matches("update").is_some() {
-        update();
+        update(&config);
     }
 }
 
-fn get_config() -> Config {
-    let config_path = match env::var("GIT_MIRROR_CONFIG") {
-        Ok(c) => c,
-        _ => panic!("GIT_MIRROR_CONFIG isn't set."),
+fn get_config(config: Option<&str>) -> Config {
+    let config_path = match config
+    {
+        Some(c) => Cow::Borrowed(c),
+        None => match env::var("GIT_MIRROR_CONFIG") {
+            Ok(c) => Cow::Owned(c),
+            _ => panic!("GIT_MIRROR_CONFIG isn't set."),
+        }
     };
 
-    let mut config_file = match File::open(Path::new(&config_path)) {
+    let s: &str = &config_path;
+    let mut config_file = match File::open(Path::new(s)) {
         Ok(c) => c,
         _ => panic!("Error opening config file."),
     };
@@ -45,18 +59,14 @@ fn get_config() -> Config {
         panic!("Error reading config file.")
     }
 
-    let config: Config = match toml::from_str(&buf) {
+    match toml::from_str(&buf) {
         Ok(c) => c,
         Err(e) => panic!("Error parsing config file. {}", e),
-    };
-
-    config
+    }
 }
 
-fn init() {
-    let config = get_config();
-
-    let projects = match config.projects {
+fn init(config: &Config) {
+    let projects = match &config.projects {
         Some(p) => p,
         _ => return,
     };
@@ -67,7 +77,7 @@ fn init() {
             project.path.as_ref().unwrap_or(&config.default_path),
         ));
 
-        match project.name {
+        match &project.name {
             Some(name) => path.push(name),
             None => path.push(utils::get_repo_name(&project.url))
         };
@@ -87,10 +97,8 @@ fn init() {
     }
 }
 
-fn update() {
-    let config = get_config();
-
-    let projects = match config.projects {
+fn update(config: &Config) {
+    let projects = match &config.projects {
         Some(p) => p,
         _ => return,
     };
@@ -101,7 +109,7 @@ fn update() {
             project.path.as_ref().unwrap_or(&config.default_path),
         ));
 
-        match project.name {
+        match &project.name {
             Some(name) => path.push(name),
             None => path.push(utils::get_repo_name(&project.url))
         };
