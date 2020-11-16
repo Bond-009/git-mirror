@@ -7,6 +7,7 @@ use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
+    result::Result
 };
 
 use clap::*;
@@ -25,16 +26,37 @@ fn main() {
             .value_name("FILE")
             .help("Sets a custom config file")
             .takes_value(true))
-        .subcommand(SubCommand::with_name("init"))
-        .subcommand(SubCommand::with_name("update"))
         .get_matches();
 
     let config = get_config(matches.value_of("config"));
 
-    if matches.subcommand_matches("init").is_some() {
-        init(&config);
-    } else if matches.subcommand_matches("update").is_some() {
-        update(&config);
+    let projects = match &config.projects {
+        Some(p) => p,
+        _ => return,
+    };
+
+    for project in projects {
+        let mut path = PathBuf::new();
+        path.push(Path::new(
+            project.path.as_ref().unwrap_or(&config.default_path),
+        ));
+
+        match &project.name {
+            Some(name) => path.push(name),
+            None => path.push(utils::get_repo_name(&project.url))
+        };
+
+        if path.exists() {
+            if let Err(e) = update(&path) {
+                eprintln!("Error updating repository {:?}; {}", &path, e);
+            }
+
+            continue;
+        }
+
+        if let Err(e) = init(&path, &project) {
+            eprintln!("Error initializing repository {:?}; {}", &path, e);
+        }
     }
 }
 
@@ -65,83 +87,26 @@ fn get_config(config: Option<&str>) -> Config {
     }
 }
 
-fn init(config: &Config) {
-    let projects = match &config.projects {
-        Some(p) => p,
-        _ => return,
-    };
-
-    for project in projects {
-        let mut path = PathBuf::new();
-        path.push(Path::new(
-            project.path.as_ref().unwrap_or(&config.default_path),
-        ));
-
-        match &project.name {
-            Some(name) => path.push(name),
-            None => path.push(utils::get_repo_name(&project.url))
-        };
-
-        if path.exists() {
-            println!("{:#?} already exists, skipping.", path);
-            continue;
-        }
-
-        let _repo = match Repository::clone(&project.url, path) {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("{}", e);
-                continue;
-            }
-        };
-    }
+fn init(path: &Path, project: &ProjectConfig)  -> Result<(), git2::Error> {
+    let _repo = Repository::clone(&project.url, path)?;
+    Ok(())
 }
 
-fn update(config: &Config) {
-    let projects = match &config.projects {
-        Some(p) => p,
-        _ => return,
-    };
+fn update(path: &Path) -> Result<(), git2::Error> {
+    let repo = Repository::open(&path)?;
 
-    for project in projects {
-        let mut path = PathBuf::new();
-        path.push(Path::new(
-            project.path.as_ref().unwrap_or(&config.default_path),
-        ));
+    // Fetch remote
+    let mut remote = repo.find_remote("origin")?;
+    remote.connect(Direction::Fetch)?;
+    let branch_buf = remote.default_branch()?;
+    let branch = branch_buf.as_str().unwrap();
+    remote.fetch(&[branch], None, None)?;
 
-        match &project.name {
-            Some(name) => path.push(name),
-            None => path.push(utils::get_repo_name(&project.url))
-        };
-
-        if !path.exists() {
-            println!("{:#?} doesn't exist, skipping.", &path);
-            continue;
-        }
-
-        let repo = match Repository::open(&path) {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("{}", e);
-                continue;
-            }
-        };
-
-        let mut remote = repo.find_remote("origin").unwrap();
-        remote.connect(Direction::Fetch).unwrap();
-        let branch_buf = remote.default_branch().unwrap();
-        let branch = branch_buf.as_str().unwrap();
-        if remote.fetch(&[branch], None, None).is_err() {
-            eprintln!("Failed fetching branch {} for {:#?}", branch, &path);
-            continue;
-        }
-
-        let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
-        let com = repo.reference_to_annotated_commit(&fetch_head).unwrap();
-        let mut branch_ref = repo.find_reference(&branch).unwrap();
-        branch_ref.set_target(com.id(), "IDK").unwrap();
-        repo.set_head(&branch).unwrap();
-        repo.checkout_head(Some(CheckoutBuilder::default().force()))
-            .unwrap();
-    }
+    let fetch_head = repo.find_reference("FETCH_HEAD")?;
+    let com = repo.reference_to_annotated_commit(&fetch_head)?;
+    let mut branch_ref = repo.find_reference(&branch)?;
+    branch_ref.set_target(com.id(), "IDK")?;
+    repo.set_head(&branch)?;
+    repo.checkout_head(Some(CheckoutBuilder::default().force()))?;
+    Ok(())
 }
