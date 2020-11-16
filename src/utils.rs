@@ -28,5 +28,6 @@ mod tests {
     #[test]
     fn get_repo_name_test() {
         assert_eq!(get_repo_name("https://github.com/Bond-009/git-mirror.git"), "git-mirror");
+        assert_eq!(get_repo_name("https://git.zx2c4.com/cgit"), "cgit");
     }
 }
