@@ -30,3 +30,6 @@ features = ["derive"]
 [features]
 default = []
 ssh = ["git2/ssh", "git2_credentials"]
+
+[profile.release]
+lto = true
