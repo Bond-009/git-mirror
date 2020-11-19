@@ -5,10 +5,28 @@ authors = ["Bond_009 <bond.009@outlook.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "^2.33"
-git2 = "^0.13"
 toml = "^0.5"
+
+[dependencies.clap]
+version = "^2.33"
+default-features = false
+features = ["color", "vec_map"]
+
+[dependencies.git2]
+version = "^0.13"
+default-features = false
+features = ["https"]
+
+[dependencies.git2_credentials]
+version = "^0.7"
+optional = true
+default-features = false
 
 [dependencies.serde]
 version = "^1.0"
+default-features = false
 features = ["derive"]
+
+[features]
+default = []
+ssh = ["git2/ssh", "git2_credentials"]
