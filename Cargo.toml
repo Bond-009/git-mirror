@@ -1,24 +1,35 @@
 [package]
 name = "git-mirror"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Bond_009 <bond.009@outlook.com>"]
-edition = "2018"
+edition = "2021"
+description = "git-mirror is a command-line program to keep local git mirrors up to date with their origin."
 
-[dependencies]
-toml = "^0.5"
+[dependencies.toml]
+version = "^0.8"
+default-features = false
+features = ["parse"]
 
 [dependencies.clap]
-version = "^2.33"
+version = "^4.5"
 default-features = false
-features = ["color", "vec_map"]
+features = [
+    "cargo",
+    "color",
+    "help",
+    "std",
+    "string",
+    "usage",
+    "wrap_help"
+]
 
 [dependencies.git2]
-version = "^0.13"
+version = "^0.18"
 default-features = false
 features = ["https"]
 
 [dependencies.git2_credentials]
-version = "^0.7"
+version = "^0.13"
 optional = true
 default-features = false
 

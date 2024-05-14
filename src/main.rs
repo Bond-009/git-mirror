@@ -4,31 +4,30 @@ mod utils;
 use std::{
     borrow::Cow,
     env,
-    fs::File,
-    io::Read,
+    fs,
     path::{Path, PathBuf},
     result::Result
 };
 
 use clap::*;
-use git2::{build::CheckoutBuilder, Direction, Repository};
+use git2::{build::CheckoutBuilder, Direction, FetchPrune, FetchOptions, Repository};
 
 use config::*;
 
 fn main() {
-    let matches = App::new(crate_name!())
+    let matches = command!()
+        .name(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
-        .arg(Arg::with_name("config")
-            .short("c")
-            .long("config")
-            .value_name("FILE")
-            .help("Sets a custom config file")
-            .takes_value(true))
+        .arg(
+            arg!(
+            -c --config <FILE> "Sets a custom config file"
+            ).value_parser(value_parser!(PathBuf)),
+        )
         .get_matches();
 
-    let config = get_config(matches.value_of("config"));
+    let config = get_config(matches.get_one::<PathBuf>("config"));
 
     let projects = match &config.projects {
         Some(p) => p,
@@ -60,27 +59,21 @@ fn main() {
     }
 }
 
-fn get_config(config: Option<&str>) -> Config {
-    let config_path = match config {
+fn get_config(config: Option<&PathBuf>) -> Config {
+    let config_path: Cow<PathBuf> = match config {
         Some(c) => Cow::Borrowed(c),
         None => match env::var("GIT_MIRROR_CONFIG") {
-            Ok(c) => Cow::Owned(c),
+            Ok(c) => Cow::Owned(PathBuf::from(c)),
             _ => panic!("GIT_MIRROR_CONFIG isn't set."),
         }
     };
 
-    let s: &str = &config_path;
-    let mut config_file = match File::open(Path::new(s)) {
+    let config_file = match fs::read_to_string(config_path.as_path()) {
         Ok(c) => c,
-        _ => panic!("Error opening config file."),
+        _ => panic!("Error reading config file."),
     };
 
-    let mut buf = String::new();
-    if config_file.read_to_string(&mut buf).is_err() {
-        panic!("Error reading config file.")
-    }
-
-    match toml::from_str(&buf) {
+    match toml::from_str(&config_file) {
         Ok(c) => c,
         Err(e) => panic!("Error parsing config file. {}", e),
     }
@@ -103,7 +96,11 @@ fn update(path: &Path) -> Result<(), git2::Error> {
     remote.connect(Direction::Fetch)?;
     let branch_buf = remote.default_branch()?;
     let branch = branch_buf.as_str().unwrap();
-    remote.fetch(&[branch], None, None)?;
+
+    let mut fetch_opt = FetchOptions::default();
+    fetch_opt.prune(FetchPrune::On);
+
+    remote.fetch(&[branch], Some(&mut fetch_opt), None)?;
 
     let fetch_head = repo.find_reference("FETCH_HEAD")?;
     let com = repo.reference_to_annotated_commit(&fetch_head)?;
